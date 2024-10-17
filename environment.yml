@@ -1,0 +1,28 @@
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - conda-build=3.21.7
+  - pip
+  - cudatoolkit=11.4
+  - faiss-cpu=1.6.3
+  - numpy=1.21.2
+  - pytorch=1.10.0
+  - sentencepiece
+  - spacy=3.3.1
+  - torchvision=0.11.0
+  - transformers=4.12.5
+  - typing_extensions=4.4.0
+  - ujson
+  - pip:
+    - wget
+    - hydra-core==1.1
+    - hydra-submitit-launcher==1.0.1
+    - pytorch-lightning
+    - tdqm
+    - jsonlines
+    - zmq
+    - pytrec_eval
+    - beir

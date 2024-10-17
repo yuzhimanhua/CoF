@@ -14,14 +14,13 @@ args = parser.parse_args()
 dataset = args.dataset
 topk = args.topk
 
-folder = '/shared/data3/yuz9/ReviewerMatching'
 paper2emb_R = {}
 paper2emb_L = {}
 paper2emb_C = {}
-with open(f'{folder}/{dataset}_papers_test.json') as fin1, \
-	 open(f'{dataset}_paper_emb_R.txt') as fin2, \
-	 open(f'{dataset}_paper_emb_L.txt') as fin3, \
-	 open(f'{dataset}_paper_emb_C.txt') as fin4:
+with open(f'data/{dataset}_papers_test.json') as fin1, \
+	 open(f'embedding/{dataset}_paper_emb_semantic.txt') as fin2, \
+	 open(f'embedding/{dataset}_paper_emb_topic.txt') as fin3, \
+	 open(f'embedding/{dataset}_paper_emb_citation.txt') as fin4:
 	for idx, (line1, line2, line3, line4) in enumerate(tqdm(zip(fin1, fin2, fin3, fin4))):
 		data1 = json.loads(line1)
 		paper = data1['paper']
@@ -40,7 +39,7 @@ with open(f'{folder}/{dataset}_papers_test.json') as fin1, \
 
 reviewer2papers = {}
 paper2reviewers = defaultdict(set)
-with open(f'{folder}/{dataset}_reviewers_test.json') as fin:
+with open(f'data/{dataset}_reviewers_test.json') as fin:
 	for line in tqdm(fin):
 		data = json.loads(line)
 		reviewer = data['reviewer']
@@ -62,7 +61,7 @@ print('topn1, topn2:', topn1, topn2)
 for task in ['soft', 'hard']:
 	qrel = {}
 	run = {}
-	with open(f'{folder}/{dataset}_queries_test_{task}.json') as fin:
+	with open(f'data/{dataset}_queries_test_{task}.json') as fin:
 		for line in tqdm(fin):
 			data = json.loads(line)
 			query = data['query_id']
@@ -95,12 +94,8 @@ for task in ['soft', 'hard']:
 
 			y = data['score']
 			y_pred = {}
-			if dataset in ['NIPS', 'SciRepEval', 'SIGIR', 'KDD', 'Architecture']:
-				for reviewer in y:
-					y_pred[reviewer] = sum(sorted(reviewer2scores[reviewer], reverse=True)[:topk])/topk
-			elif dataset in ['Secure']:
-				for reviewer in reviewer2papers:
-					y_pred[reviewer] = sum(sorted(reviewer2scores[reviewer], reverse=True)[:topk])/topk
+			for reviewer in y:
+				y_pred[reviewer] = sum(sorted(reviewer2scores[reviewer], reverse=True)[:topk])/topk
 			qrel[query] = y
 			run[query] = y_pred
 
@@ -113,4 +108,4 @@ for task in ['soft', 'hard']:
 	p5, p10, mapr, ndcg = p5*100, p10*100, mapr*100, ndcg*100
 	print(p5, p10, mapr, ndcg)
 	with open('scores.txt', 'a') as fout:
-		fout.write('{:.2f}'.format(p5)+'\t'+'{:.2f}'.format(p10)+'\t'+'{:.2f}'.format(mapr)+'\t'+'{:.2f}'.format(ndcg)+'\n')
+		fout.write('{:.2f}'.format(p5)+'\t'+'{:.2f}'.format(p10)+'\n')
