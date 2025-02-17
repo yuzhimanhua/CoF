@@ -5,9 +5,9 @@ Biencoder for univerisal paired representation learning.
 """
 
 import collections
+import logging
 from dataclasses import dataclass
 import itertools
-import logging
 import random
 import token
 from typing import Dict, Tuple, List
@@ -162,7 +162,6 @@ def init_moe_from_nonmoe_pretrained(pretrained_sd, moe_sd,
     for var_name in moe_sd:
         if moe_layer_name in var_name or "moe" in var_name:
             pretrained_var_name = normalize_var_name(var_name)
-            logger.info(f"Loads {var_name} from {pretrained_var_name}")
         else:
             pretrained_var_name = var_name
 
@@ -174,13 +173,10 @@ def init_moe_from_nonmoe_pretrained(pretrained_sd, moe_sd,
     again_missing_vars = []
     for var_name, _ in missing_vars:
         if "expert_gate" in var_name:
-            logger.info("Random init %s", var_name)
             state_dict[var_name] = moe_sd[var_name]
         else:
             again_missing_vars.append(var_name)
 
-    if again_missing_vars:
-        print("Missing again variables:", again_missing_vars)
     return state_dict
 
 
@@ -195,7 +191,6 @@ def init_moe_from_moe_pretrained(pretrained_sd, moe_sd,
         for key in to_moe_map
     ]
 
-    print(moe_index_maps)
     pattern_list = [
        "interm_layers",
        "output_layers",
@@ -218,7 +213,6 @@ def init_moe_from_moe_pretrained(pretrained_sd, moe_sd,
     for var_name in moe_sd:
         if moe_layer_name in var_name or "moe" in var_name:
             pretrained_var_name = normalize_var_name(var_name)
-            print(f"Loads {var_name} from {pretrained_var_name}")
         else:
             pretrained_var_name = var_name
 
@@ -230,13 +224,10 @@ def init_moe_from_moe_pretrained(pretrained_sd, moe_sd,
     again_missing_vars = []
     for var_name, _ in missing_vars:
         if "expert_gate" in var_name:
-            logger.info("Random init %s", var_name)
             state_dict[var_name] = moe_sd[var_name]
         else:
             again_missing_vars.append(var_name)
 
-    if again_missing_vars:
-        print("Missing again variables:", again_missing_vars)
     return state_dict
 
 
@@ -250,10 +241,7 @@ def init_nonmoe_from_moe_pretrained(pretrained_moe_sd, self_sd,
 
     if from_moe_map:
         n_experts = len(from_moe_map)
-        print(f"Loading from {n_experts} experts from the pretrained model")
-        print(from_moe_map)
     else:
-        print("Loading the average of all from the pretrained model")
         if pretrain_n_expert is None:
             raise ValueError("When from_moe_map is None, pretrained_n_expert is required!")
         n_experts = pretrain_n_expert
@@ -314,7 +302,6 @@ def init_nonmoe_from_moe_pretrained(pretrained_moe_sd, self_sd,
     first_moe_layer = True
 
     for var_name in self_sd:
-        # print(var_name)
         from_vars = from_var_gps.get(var_name, None)
         if from_vars:
             if len(from_vars) > 1 and from_moe_map:
@@ -325,25 +312,17 @@ def init_nonmoe_from_moe_pretrained(pretrained_moe_sd, self_sd,
             state_dict[var_name] = gather_vars(pretrained_moe_sd, from_vars)
             if len(from_vars) > 1:
                 if verbose or first_moe_layer:
-                    print(f"Loads {var_name} from ", ";".join(from_vars), f" w/ factor {normalize_factor}")
                     first_moe_layer = False
                 state_dict[var_name] /= normalize_factor
-            else:
-                if verbose or "layer.0." in var_name:
-                    print(f"Loads {var_name} from ", ";".join(from_vars))
         else:
             missing_vars.append((var_name, var_name))
 
     again_missing_vars = []
     for var_name, _ in missing_vars:
         if "expert_gate" in var_name:
-            print("Random init %s", var_name)
             state_dict[var_name] = self_sd[var_name]
         else:
             again_missing_vars.append(var_name)
-
-    if again_missing_vars:
-        print("Missing again variables:", again_missing_vars)
 
     return state_dict
 
@@ -607,36 +586,24 @@ class MoEBiEncoderUni(nn.Module):
             self.num_q_expert = self.question_model.num_expert
             self.num_ctx_expert = self.ctx_model.num_expert
 
-        logger.info("Total number of experts: %d", self.num_expert)
-        logger.info("number of q experts: %d", self.num_q_expert)
-        logger.info("number of ctx experts: %d", self.num_ctx_expert)
-        logger.info("use_infer_expert for question_model: %s", question_model.use_infer_expert)
-        logger.info("use_infer_expert for ctx_model: %s", ctx_model.use_infer_expert)
-
         #TODO: Makes this output configurable.
         self.linear = None
         if q_rep_method == "start_end_concat" and ctx_rep_method == "cls":
-            print("Using concat of start and end embeddings as representation")
             self.linear = nn.Linear(768*2, 768)
             self.linear.weight.data.normal_(mean=0.0, std=0.02)
-        elif q_rep_method == "start_end_sum":
-            print("Using sum of start and end embeddings as representation")
-        else:
+        elif q_rep_method != "start_end_sum":
             raise NotImplementedError
 
         self.span_proj = None
         self.span_query = None
         if self.do_span:
             if span_rep_method == "start_end_concat":
-                print("Using concat of start and end embeddings with tanh")
                 hidden_dim = self.question_model.encoder.config.hidden_size
                 self.span_proj = nn.Linear(hidden_dim * 2, hidden_dim)
                 self.span_proj.weight.data.normal_(mean=0.0, std=0.02)
                 self.span_query = nn.Linear(hidden_dim, 1)
                 self.span_query.weight.data.normal_(mean=0.0, std=0.02)
-            elif span_rep_method == "start_end_sum":
-                print("Using sum of start and end embeddings as span representation")
-            else:
+            elif span_rep_method != "start_end_sum":
                 raise NotImplementedError
 
     @staticmethod
@@ -738,7 +705,6 @@ class MoEBiEncoderUni(nn.Module):
             if (q_expert_ids >= self.num_expert).sum() > 0:
                 raise ValueError("q_expert_ids bigger than num_expert", q_expert_ids)
 
-        # print("query_expert_ids", q_expert_ids)
         # _q_seq, q_pooled_out, _q_hidden = self.get_representation(
         q_outputs = self.get_representation(
             q_encoder,
@@ -758,11 +724,8 @@ class MoEBiEncoderUni(nn.Module):
 
         # q_pooled_out = q_outputs[1]
         if q_rep_token_pos is not None:
-            # print("Using q_rep_token_pos", q_rep_token_pos)
-            # print("Using q_rep_token_pos for questions")
             q_pooled_out = get_span_representation(q_outputs[0], q_rep_token_pos, span_method=q_rep_method)
         else:
-            # print("Using pooled representation for questions")
             q_pooled_out = q_outputs[1]
 
         if self.linear is not None:
@@ -814,10 +777,6 @@ class MoEBiEncoderUni(nn.Module):
         else:
             if (ctx_expert_ids >= self.num_expert).sum() > 0:
                 raise ValueError("ctx_expert_ids bigger than num_expert", ctx_expert_ids)
-            # if q_expert_ids.max() >= ctx_expert_ids.min():
-            #     logger.warning("query and ctx expert id overlaps!")
-
-        # print("ctx_expert_ids", ctx_expert_ids)
 
         # _ctx_seq, ctx_pooled_out, _ctx_hidden = self.get_representation(
         ctx_outputs= self.get_representation(
@@ -853,27 +812,16 @@ class MoEBiEncoderUni(nn.Module):
 
         has_concat_rep_weight = "linear.weight" in saved_state.model_dict
         if has_concat_rep_weight:
-            if self.q_rep_method == "start_end_concat":
-                logger.info("Loading linear layer for start_end_concat q_rep_method")
-            else:
+            if self.q_rep_method != "start_end_concat":
                 del saved_state.model_dict["linear.weight"]
                 del saved_state.model_dict["linear.bias"]
-
-        # TODO: This is hardcoded namespace check.
-        if from_moe_map:
-            logger.info("Loading from a MoE checkpoint")
-        else:
-            logger.info("Loading from a non-MoE checkpoint")
 
         self_dict = self.state_dict()
         if to_moe_map:
             if from_moe_map:
-                logger.info("Initialize a small MoE model from a larger one")
-                logger.info(f"from {from_moe_map} to {to_moe_map}")
                 updated_model_dict = init_moe_from_moe_pretrained(
                     saved_state.model_dict, self_dict, from_moe_map, to_moe_map)
             else:
-                logger.info("Initializing a MoE model")
                 updated_model_dict = init_moe_from_nonmoe_pretrained(
                     saved_state.model_dict, self_dict)
             self.load_state_dict(updated_model_dict)
@@ -914,14 +862,10 @@ class InstructBiEncoderUni(nn.Module):
 
         self.query_instruct_proj = None
         if not self.deep_instruct_fusion:
-            print("Not using deep fusion for instruction and query.")
-            print("Using concat of query and instruct representations.")
             input_dim = self.question_model.get_out_size() + self.instruct_model.get_out_size()
             output_dim = self.ctx_model.get_out_size()
             self.query_instruct_proj = nn.Linear(input_dim, output_dim)
             self.query_instruct_proj.weight.data.normal_(mean=0.0, std=0.02)
-        else:
-            print("Using deep fusion for instruction and query as well as instruction and ctx.")
             
         self.q_rep_method = q_rep_method
         self.entity_drop_prob = entity_drop_prob
@@ -929,21 +873,15 @@ class InstructBiEncoderUni(nn.Module):
         self.ctx_rep_method = ctx_rep_method
 
         if self.fix_instruct_encoder:
-            print("\n\n")
-            print("The instruct encoder model weights are fixed.")
-            print("\n\n")
             for param in self.instruct_model.parameters():
                 param.requires_grad = False
 
         #TODO: Makes this output configurable.
         self.linear = None
         if q_rep_method == "start_end_concat" and ctx_rep_method == "cls":
-            print("Using concat of start and end embeddings as representation")
             self.linear = nn.Linear(768*2, 768)
             self.linear.weight.data.normal_(mean=0.0, std=0.02)
-        elif q_rep_method == "start_end_sum":
-            print("Using sum of start and end embeddings as representation")
-        else:
+        elif q_rep_method != "start_end_sum":
             raise NotImplementedError
 
     def load_state(self, saved_state: CheckpointState,
@@ -956,9 +894,7 @@ class InstructBiEncoderUni(nn.Module):
             del saved_state.model_dict["ctx_model.embeddings.position_ids"]
         has_concat_rep_weight = "linear.weight" in saved_state.model_dict
         if has_concat_rep_weight:
-            if self.q_rep_method == "start_end_concat":
-                logger.info("Loading linear layer for start_end_concat q_rep_method")
-            else:
+            if self.q_rep_method != "start_end_concat":
                 del saved_state.model_dict["linear.weight"]
                 del saved_state.model_dict["linear.bias"]
 
@@ -969,32 +905,24 @@ class InstructBiEncoderUni(nn.Module):
                 break
 
         if not has_instruct_weight:
-            print("\n\n")
-            print("No instruction model weights found!")
-            print("If not desirable, please check the checkpoint!")
-            print("\n\n")
             updated_state_dict = dict(saved_state.model_dict)
             self_state_dict = self.get_state_dict()
             for var_name in self_state_dict:
                 if "instruct_model" in var_name:
                     if self.fix_instruct_encoder:
-                        print("Loading instruction model weights from pretrained model (possibly random init).")
                         updated_state_dict[var_name] = self_state_dict[var_name]
                     else:
-                        print("Loading instruction model weights from question model.")
                         # Loads from question_model.
                         from_var = regex.sub("instruct_model", "question_model", var_name)
                         updated_state_dict[var_name] = updated_state_dict[from_var]
                     
                 if "query_instruct_proj" in var_name:
                     if var_name not in updated_state_dict:
-                        print("No query_instruct_proj weight found, randomly init.")
                         updated_state_dict[var_name] = self_state_dict[var_name]
 
             self.load_state_dict(updated_state_dict)
             return
 
-        logger.info("Loading from a non-MoE checkpoint")
         self.load_state_dict(saved_state.model_dict)
 
     def get_state_dict(self):
@@ -1181,12 +1109,9 @@ class BiEncoderUni(nn.Module):
         #TODO: Makes this output configurable.
         self.linear = None
         if q_rep_method == "start_end_concat" and ctx_rep_method == "cls":
-            print("Using concat of start and end embeddings as representation")
             self.linear = nn.Linear(768*2, 768)
             self.linear.weight.data.normal_(mean=0.0, std=0.02)
-        elif q_rep_method == "start_end_sum":
-            print("Using sum of start and end embeddings as representation")
-        else:
+        elif q_rep_method != "start_end_sum":
             raise NotImplementedError
 
     @staticmethod
@@ -1595,8 +1520,6 @@ class BiEncoderUni(nn.Module):
                 )
                 question_offset = all_encoded_question_inputs.question_offset
                 if question_offset[0] is None or question_offset[1] is None:
-                    logger.warning("Can not find start or end for")
-                    logger.warning(sample)
                     raise ValueError("Fail to get the span positions.")
                 entity_token_dropout(
                     all_encoded_question_inputs,
@@ -1606,8 +1529,6 @@ class BiEncoderUni(nn.Module):
                     entity_drop_prob=entity_drop_prob,
                 )
 
-                # if question_offset [0] != all_encoded_question_inputs.question_offset[0]:
-                #     logger.info("Entity is dropped")
                 question_offset = all_encoded_question_inputs.question_offset
 
                 if is_span_proposal_case:
@@ -1623,7 +1544,6 @@ class BiEncoderUni(nn.Module):
                 all_encoded_question_inputs = orig_encoded_question_inputs
                 question_offset = [0, 0]
 
-            # print(tensorizer.tokenizer.decode(all_encoded_question_inputs.input_ids))
             q_tensor = torch.tensor(all_encoded_question_inputs.input_ids)
             q_attn_mask = torch.tensor(all_encoded_question_inputs.attention_mask)
 
@@ -1659,7 +1579,6 @@ class BiEncoderUni(nn.Module):
 
         if use_instruct:
             if question_instruct is None:
-                print(sample.query_instruct)
                 raise ValueError("When use_instruct=True, question_instruct is not allowed to be None!")
 
             instruct_inputs =  tensorizer.encode_text(
@@ -1721,14 +1640,11 @@ class BiEncoderUni(nn.Module):
             del saved_state.model_dict["ctx_model.embeddings.position_ids"]
         has_concat_rep_weight = "linear.weight" in saved_state.model_dict
         if has_concat_rep_weight:
-            if self.q_rep_method == "start_end_concat":
-                logger.info("Loading linear layer for start_end_concat q_rep_method")
-            else:
+            if self.q_rep_method != "start_end_concat":
                 del saved_state.model_dict["linear.weight"]
                 del saved_state.model_dict["linear.bias"]
 
         if from_moe_map:
-            logger.info("Loading from a MoE checkpoint")
             updated_state_dict = init_nonmoe_from_moe_pretrained(
                 saved_state.model_dict,
                 self.get_state_dict(),
@@ -1738,7 +1654,6 @@ class BiEncoderUni(nn.Module):
             self.load_state_dict(updated_state_dict)
             return
 
-        logger.info("Loading from a non-MoE checkpoint")
         self.load_state_dict(saved_state.model_dict)
 
     def get_state_dict(self):

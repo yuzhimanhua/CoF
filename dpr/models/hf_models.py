@@ -40,7 +40,6 @@ from dpr.models.moe_models import MoEBertModel
 from dpr.models.instruct_bert import InstructBertModel
 from dpr.models.optimization import get_layer_lrs, get_layer_lrs_for_t5, AdamWLayer
 
-
 logger = logging.getLogger(__name__)
 
 model_mapping = {
@@ -173,10 +172,8 @@ def get_any_biencoder_components(cfg, use_instruct=False, inference_only: bool =
             num_q_expert = cfg.encoder.num_q_expert
             num_ctx_expert = num_expert - num_q_expert
         else:
-            print("No num_q_expert is set")
             num_q_expert = cfg.encoder.num_expert
             num_ctx_expert = cfg.encoder.num_expert
-            logger.warning("No num_q_expert is specified, sets num_q_expert=num_ctx_expert=num_expert=%d" % num_expert)
     else:
         num_expert = 1
         use_infer_expert = False
@@ -185,16 +182,11 @@ def get_any_biencoder_components(cfg, use_instruct=False, inference_only: bool =
 
     if hasattr(cfg, "train") and hasattr(cfg.train, "use_vat"):
         use_vat = cfg.train.use_vat
-    if use_vat:
-        print("Adversarial biencoder DPR.")
-    else:
-        print("Vanilla biencoder DPR.")
 
     mean_pool_q_encoder = False
     if cfg.encoder.mean_pool:
         mean_pool_q_encoder = True
         if cfg.encoder.mean_pool_ctx_only:
-            logger.info("Uses mean-pooling for context encoder only.")
             mean_pool_q_encoder = False
 
     factor_rep = cfg.encoder.factor_rep
@@ -225,7 +217,6 @@ def get_any_biencoder_components(cfg, use_instruct=False, inference_only: bool =
     fix_instruct_enocder = cfg.encoder.fix_instruct_encoder if hasattr(cfg.encoder, "fix_instruct_encoder") else False
 
     if cfg.encoder.shared_encoder:
-        logger.info("Uses a shared encoder for both question and context.")
         ctx_encoder = question_encoder
     else:
         ctx_encoder = HFEncoder(
@@ -278,7 +269,6 @@ def get_any_biencoder_components(cfg, use_instruct=False, inference_only: bool =
     if use_uni_biencoder:
         if not hasattr(cfg.encoder, "q_rep_method"):
             raise ValueError("q_rep_method is not configured!")
-        print("Using Unified Biencoder.")
         if use_moe or use_vat:
             biencoder = MoEBiEncoderUni(
                 question_encoder, ctx_encoder,
@@ -306,7 +296,6 @@ def get_any_biencoder_components(cfg, use_instruct=False, inference_only: bool =
             )
 
     elif use_moe:
-        logger.info("Using MOE model")
         if num_q_expert is not None:
             offet_expert_id = True
         else:
@@ -330,7 +319,6 @@ def get_any_biencoder_components(cfg, use_instruct=False, inference_only: bool =
         )
 
     if cfg.encoder.pretrained_file:
-        logger.info("loading biencoder weights from %s, this should be a trained DPR model checkpoint", cfg.encoder.pretrained_file)
         checkpoint = load_states_from_checkpoint(cfg.encoder.pretrained_file)
         model_to_load = get_model_obj(biencoder)
         model_to_load.load_state(checkpoint)
@@ -423,7 +411,6 @@ def get_any_tokenizer(pretrained_cfg_name: str, do_lower_case: bool = True):
         model_name = pretrained_cfg_name.split('-')[0]
 
     tokenizer_class = model_mapping[model_name][1]
-    logger.info("The tokenizer used is %s", tokenizer_class.__name__)
     return tokenizer_class.from_pretrained(pretrained_cfg_name)
 
 
@@ -593,7 +580,6 @@ def init_moe_from_pretrained_mapping(pretrained_sd, moe_sd,
                     moe_print = False
                 else:
                     prev_layer = cur_layer
-                    logger.info(f"Loads {var_name} from {pretrained_var_name}")
         else:
             pretrained_var_name = var_name
 
@@ -605,13 +591,10 @@ def init_moe_from_pretrained_mapping(pretrained_sd, moe_sd,
     again_missing_vars = []
     for var_name, _ in missing_vars:
         if "expert_gate" in var_name:
-            logger.info("Random init %s", var_name)
             state_dict[var_name] = moe_sd[var_name]
         else:
             again_missing_vars.append(var_name)
 
-    if again_missing_vars:
-        print("Missing again variables:", again_missing_vars)
     return state_dict
 
     
@@ -635,8 +618,6 @@ def init_instruct_from_pretrained_mapping(pretrained_sd, target_sd,
         else:
             missing_vars.append(var_name)
 
-    if missing_vars:
-        print("Missing again variables:", missing_vars)
     return state_dict
 
 
@@ -676,14 +657,11 @@ class HFEncoder(nn.Module):
         else:
             model_name = cfg_name.split('-')[0]
         if use_moe:
-            logger.info("Using MoE models for HFEncoder")
-            logger.info("Number of expert: %d", num_expert)
             config_class, _, model_class = moe_model_mapping[model_name]
             assert num_expert > 0, "num_expert can't be zero when using MoE."
         elif use_vat:
             config_class, _, model_class = adv_model_mapping[model_name]
         elif use_instruct:
-            logger.info("Using instruction models for HFEncoder")
             config_class, _, model_class = instruct_model_mapping[model_name]
         else:
             config_class, _, model_class = model_mapping[model_name]
@@ -704,24 +682,15 @@ class HFEncoder(nn.Module):
         self.factor_rep = factor_rep
         self.use_moe = use_moe
         self.use_norm_rep = use_norm_rep
-        if self.use_norm_rep:
-            logger.info("Normalizing the representation using L2")
-        else:
-            logger.info("Directly using the raw representation")
 
         self.seq_rep_method = seq_rep_method
 
-        if mean_pool:
-            logger.info("Uses mean-pooling for getting representations.")
         self.encode_proj = None
         if projection_dim != 0:
-            logger.info("Uses encode projection layer.")
             if projection_dim == -1:
-                logger.info("projection_dim=%d", cfg.hidden_size)
                 output_dim = cfg.hidden_size
                 # self.encode_proj = SimHeader(cfg.hidden_size, cfg.hidden_size, dropout=dropout)
             else:
-                logger.info("projection_dim=%d", projection_dim)
                 output_dim = projection_dim
             
             header_type, nheader = task_header_type.split(":")
@@ -756,10 +725,6 @@ class HFEncoder(nn.Module):
             self.use_instruct = use_instruct
         else:
             self.encoder =  model_class.from_pretrained(cfg_name, config=cfg, **kwargs)
-
-        print("\n\n")
-        print("Using encoder type:", type(self.encoder))
-        print("\n\n")
 
     def forward(
         self,
@@ -867,14 +832,12 @@ def get_bert_tensorizer(cfg, tokenizer=None):
 
 
 def _add_special_tokens(tokenizer, special_tokens):
-    logger.info("Adding special tokens %s", special_tokens)
     special_tokens_num = len(special_tokens)
     # TODO: this is a hack-y logic that uses some private tokenizer structure which can be changed in HF code
     assert special_tokens_num < 50
     unused_ids = [
         tokenizer.vocab["[unused{}]".format(i)] for i in range(special_tokens_num)
     ]
-    logger.info("Utilizing the following unused token ids %s", unused_ids)
 
     for idx, id in enumerate(unused_ids):
         del tokenizer.vocab["[unused{}]".format(idx)]
@@ -882,11 +845,6 @@ def _add_special_tokens(tokenizer, special_tokens):
         tokenizer.ids_to_tokens[id] = special_tokens[idx]
 
     tokenizer._additional_special_tokens = list(special_tokens)
-    logger.info(
-        "Added special tokenizer.additional_special_tokens %s",
-        tokenizer.additional_special_tokens,
-    )
-    logger.info("Tokenizer's all_special_tokens %s", tokenizer.all_special_tokens)
 
 
 def get_roberta_tensorizer(args, tokenizer=None):
@@ -921,10 +879,7 @@ def get_optimizer(
         }
 
     if opt_name == "adam" and use_layer_lr:
-        logger.info("Using Adam w layerwise adaptive learning rate")
-        logger.info("Adam beta1=%f, beta2=%f", adam_betas[0], adam_betas[1])
         if use_t5:
-            logger.info("Using T5")
             name_to_adapt_lr = get_layer_lrs_for_t5(
                 layer_decay=layer_decay,
                 n_layers=n_layers,
@@ -935,7 +890,6 @@ def get_optimizer(
                 n_layers=n_layers,
             )
         optimizer_grouped_parameters = []
-        logger.info(name_to_adapt_lr)
         for name, param in model.named_parameters():
             update_for_var = False
             for key in name_to_adapt_lr:
@@ -955,8 +909,6 @@ def get_optimizer(
                 # Parameters with no decay.
                 wdecay = 0.0
             if "moe" in name:
-                if "layer.1." in name:
-                    logger.info(f"Applying moe_factor {moe_factor} for LR with {name}")
                 lr_adapt_weight *= moe_factor
             optimizer_grouped_parameters.append({
                 "params": param,
@@ -965,8 +917,6 @@ def get_optimizer(
             })
         optimizer = AdamWLayer(optimizer_grouped_parameters, lr=learning_rate, eps=adam_eps, betas=adam_betas)
     elif opt_name == "adam":
-        logger.info("Using Adam")
-        logger.info("Adam beta1=%f, beta2=%f", adam_betas[0], adam_betas[1])
         optimizer_grouped_parameters = [
             {
                 "params": [
@@ -987,7 +937,6 @@ def get_optimizer(
         ]
         optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_eps, betas=adam_betas)
     elif opt_name == "adafactor":
-        logger.info("Using Adafactor")
         optimizer = Adafactor(
             model.parameters(),
             lr=learning_rate,
@@ -1098,7 +1047,6 @@ class HFTensorizer(Tensorizer):
         self.is_fast_tokenizer = True
         if not issubclass(tokenizer.__class__, PreTrainedTokenizerFast):
             self.is_fast_tokenizer = False
-            logger.info("Only fast tokenizer is supported")
 
         self.max_length = max_length
         self.pad_to_max = pad_to_max

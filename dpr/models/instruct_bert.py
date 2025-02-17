@@ -52,13 +52,11 @@ class InstructBertSelfAttention(nn.Module):
         self.use_attn_gate = False
         self.gate = 1.0
         if config.use_attn_gate:
-            logger.info("Using gating for instruction hidden attention!")
             self.use_attn_gate = True
             self.gate = torch.nn.Parameter(torch.zeros(1, config.num_attention_heads, 1, 1))
 
         self.proj_adaptor = False
         if config.proj_adaptor:
-            logger.info("Add extra adaptor weights!")
             self.proj_adaptor = True
             self.adaptor = nn.Linear(config.hidden_size, config.hidden_size)
 
@@ -404,9 +402,6 @@ class InstructBertEncoder(nn.Module):
         else:
             is_instruct_layer = instruct_to_func[instruct_type]
 
-        print("\n\n")
-        print(f"Using instruct type {instruct_type}")
-        print("\n\n")
         self.layer = nn.ModuleList([
             InstructBertLayer(config) if is_instruct_layer(layer_id) else BertLayer(config)
             for layer_id in range(config.num_hidden_layers)])
@@ -471,9 +466,6 @@ class InstructBertEncoder(nn.Module):
 
             if self.gradient_checkpointing and self.training:
                 if use_cache:
-                    logger.warning(
-                        "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
-                    )
                     use_cache = False
 
                 def create_custom_forward(module):
@@ -565,10 +557,6 @@ class InstructBertModel(BertPreTrainedModel):
         super().__init__(config)
         self.config = config
 
-        if config.use_attn_gate:
-            print("\n\n")
-            print("Using attention gating for instructions.")
-            print("\n\n")
         self.embeddings = BertEmbeddings(config)
         self.encoder = InstructBertEncoder(config)
         self.pooler = BertPooler(config)

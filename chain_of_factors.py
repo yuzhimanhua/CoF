@@ -6,7 +6,7 @@ from collections import defaultdict
 import pytrec_eval
 
 parser = argparse.ArgumentParser(description='main', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--dataset', default='KDD')
+parser.add_argument('--dataset', default='SIGIR')
 parser.add_argument('--topn1', type=int, default=50)
 parser.add_argument('--topn2', type=int, default=100)
 parser.add_argument('--topk', type=int, default=3)
@@ -21,6 +21,7 @@ with open(f'data/{dataset}_papers_test.json') as fin1, \
 	 open(f'embedding/{dataset}_paper_emb_semantic.txt') as fin2, \
 	 open(f'embedding/{dataset}_paper_emb_topic.txt') as fin3, \
 	 open(f'embedding/{dataset}_paper_emb_citation.txt') as fin4:
+	print('Getting paper embeddings...')
 	for idx, (line1, line2, line3, line4) in enumerate(tqdm(zip(fin1, fin2, fin3, fin4))):
 		data1 = json.loads(line1)
 		paper = data1['paper']
@@ -40,6 +41,7 @@ with open(f'data/{dataset}_papers_test.json') as fin1, \
 reviewer2papers = {}
 paper2reviewers = defaultdict(set)
 with open(f'data/{dataset}_reviewers_test.json') as fin:
+	print('Getting reviewer profiles...')
 	for line in tqdm(fin):
 		data = json.loads(line)
 		reviewer = data['reviewer']
@@ -51,17 +53,17 @@ with open(f'data/{dataset}_reviewers_test.json') as fin:
 if args.topn1 > 0:
 	topn1 = int(len(paper2reviewers)/args.topn1)
 else:
-	topn1 = max(-args.topn1, 1)
+	topn1 = 1
 if args.topn2 > 0:
 	topn2 = int(len(paper2reviewers)/args.topn2)
 else:
-	topn2 = max(-args.topn2, 1)
-print('topn1, topn2:', topn1, topn2)
+	topn2 = 1
 
 for task in ['soft', 'hard']:
 	qrel = {}
 	run = {}
 	with open(f'data/{dataset}_queries_test_{task}.json') as fin:
+		print('Evaluate the {} setting...'.format(task))
 		for line in tqdm(fin):
 			data = json.loads(line)
 			query = data['query_id']
@@ -106,6 +108,13 @@ for task in ['soft', 'hard']:
 	mapr = pytrec_eval.compute_aggregated_measure('map', [query_measures['map'] for query_measures in results.values()])
 	ndcg = pytrec_eval.compute_aggregated_measure('ndcg', [query_measures['ndcg'] for query_measures in results.values()])
 	p5, p10, mapr, ndcg = p5*100, p10*100, mapr*100, ndcg*100
-	print(p5, p10, mapr, ndcg)
+
+	print('[Result]', task, 'P@5:', p5)
+	print('[Result]', task, 'P@10:', p10)
 	with open('scores.txt', 'a') as fout:
-		fout.write('{:.2f}'.format(p5)+'\t'+'{:.2f}'.format(p10)+'\n')
+		if task == 'soft':
+			fout.write('dataset: {}'.format(dataset)+'\n')
+		fout.write('{} P@5: {:.2f}'.format(task, p5)+'\n')
+		fout.write('{} P@10: {:.2f}'.format(task, p10)+'\n')
+		if task == 'hard':
+			fout.write('\n')

@@ -142,13 +142,6 @@ class GroupBiEncoder(nn.Module):
         else:
             self.num_q_expert = num_expert // 2
             self.num_ctx_expert = num_expert // 2
-        logger.info("Total number of experts: %d", self.num_expert)
-        logger.info("number of q experts: %d", self.num_q_expert)
-        logger.info("number of ctx experts: %d", self.num_ctx_expert)
-        logger.info("use_infer_expert for question_model: %s", question_model.use_infer_expert)
-        logger.info("use_infer_expert for ctx_model: %s", ctx_model.use_infer_expert)
-        logger.info("using num_q_group: %d", num_q_group)
-        logger.info("using num_ctx_group: %d", num_ctx_group)
         self.q_gp_model = GroupModel(num_q_group, question_model.get_out_size())
         self.ctx_gp_model = GroupModel(num_ctx_group, ctx_model.get_out_size())
         self.offset_expert_id = offset_expert_id
@@ -331,11 +324,6 @@ class MoEBiEncoder(nn.Module):
         else:
             self.num_q_expert = num_expert // 2
             self.num_ctx_expert = num_expert // 2
-        logger.info("Total number of experts: %d", self.num_expert)
-        logger.info("number of q experts: %d", self.num_q_expert)
-        logger.info("number of ctx experts: %d", self.num_ctx_expert)
-        logger.info("use_infer_expert for question_model: %s", question_model.use_infer_expert)
-        logger.info("use_infer_expert for ctx_model: %s", ctx_model.use_infer_expert)
         self.offset_expert_id = offset_expert_id
 
     @staticmethod
@@ -885,8 +873,6 @@ class BiEncoderNllLoss(object):
             sec_q_loss = torch.mean((q_norm - mu_q).norm(dim=0, p=2))
             sec_ctx_loss = torch.mean((ctx_norm - mu_ctx).norm(dim=0, p=2))
             sec_loss = (sec_q_loss + sec_ctx_loss) / 2.0
-            logger.debug("sec_loss: ", sec_loss.item())
-            logger.debug("vanilla_loss: ", loss.item())
             loss += gamma * sec_loss
 
         if loss_scale:
@@ -938,7 +924,6 @@ def _select_span_with_token(
                 query_tensor, tensorizer.get_pad_id(), tensorizer.max_length
             )
             query_tensor[-1] = tensorizer.tokenizer.sep_token_id
-            # logger.info('aligned query_tensor %s', query_tensor)
 
             assert id in query_tensor, "query_tensor={}".format(query_tensor)
             return query_tensor

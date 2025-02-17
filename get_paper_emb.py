@@ -8,6 +8,9 @@ from dpr.models.hf_models import HFEncoder, get_any_tokenizer
 from dpr.models.biencoder_uni import InstructBiEncoderUni
 from dpr.utils.model_utils import move_to_device
 
+from transformers import logging
+logging.set_verbosity_error()
+
 def get_any_biencoder_component_for_infer(cfg, use_instruct=True, **kwargs):
 	dropout = 0.0
 	use_vat = False
@@ -145,19 +148,16 @@ ctx_instruct_text = query_instruct_text
 if use_instruct:
 	if query_instruct_text is None:
 		raise ValueError('When use_instruct=True, query_instruct_text is required!')
-	print('Using query_instruct=', query_instruct_text)
-	print('Using ctx_instruct=', ctx_instruct_text)
 
 # Reads in the model parameters
 model_fn = f'./model/{args.model}'
 state_dict = torch.load(model_fn)
 tokenizer, biencoder = get_any_biencoder_component_for_infer(state_dict['encoder_params'], use_instruct=use_instruct)
+print('[Instruction]', query_instruct_text)
 
 # CLS or mean pooling
 norm_rep = False
 if state_dict['encoder_params']['mean_pool']:
-	print('The model uses mean_pool representation, using cos distance by default')
-	print('If not desirable, please fix it')
 	norm_rep = True
 
 # Loads the pretrain checkpoints.
@@ -202,8 +202,6 @@ with open(paper_fn) as fin:
 	
 with open(paper_fn) as fin:
 	paper_texts = [paper_formatting(json.loads(line), tokenizer) for line in fin]
-
-print('Number of papers: %d' % len(paper_ids))
 
 # Starts embedding papers.
 total_data_size = len(paper_ids)

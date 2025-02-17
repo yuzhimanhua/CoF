@@ -133,7 +133,6 @@ def create_reader_input(pad_token_id: int,
                                                            is_train,
                                                            is_random=shuffle)    
         if not sample_tensors:
-            logger.warning('No valid passages combination for question=%s ', sample.question)
             continue
         sample_input_ids, starts_tensor, ends_tensor, answer_mask = sample_tensors
         input_ids.append(sample_input_ids)

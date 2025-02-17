@@ -610,23 +610,16 @@ class MoEBertEncoder(nn.Module):
         # TODO: Makes this configurable later.
         self.per_layer_gate_input = True
         is_moe_layer = moe_type_to_func[moe_type]
-        logger.info(f"Using {moe_type} for MoEBERT")
-        logger.info(f"Using {config.moe_type}")
         self.is_tok_moe = False
         if "tok" in config.moe_type.split(":")[1]:
             self.is_tok_moe = True
-            logger.info("Using token-level moe")
-        else:
-            logger.info("Using sentence-level moe")
 
         if "attn" in config.moe_type.split(":")[1]:
             use_attn_moe = True
-            logger.info("Using moe for attention layers")
         else:
             use_attn_moe = False
         if "fwd" in config.moe_type.split(":")[1]:
             use_fwd_moe = True
-            logger.info("Using moe for forward layers")
         else:
             use_fwd_moe = False
         self.layer = nn.ModuleList([
@@ -636,19 +629,11 @@ class MoEBertEncoder(nn.Module):
             1.0
             if is_moe_layer(layer_id) else 0.0 for layer_id in range(config.num_hidden_layers)])
         if self.use_infer_expert:
-            logger.info("Using gating for selecting expert")
             if self.per_layer_gating:
-                logger.info("Using per layer gating")
                 self.expert_gate = nn.ModuleList([ExpertGating(config) if is_moe_layer(layer_id) else None for layer_id in range(config.num_hidden_layers)])
             else:
-                logger.info("Using single layer for all gating")
-                if self.per_layer_gate_input:
-                    logger.info("Each layer will select different gate")
-                else:
-                    logger.info("All layers will select the same gate")
                 self.expert_gate = ExpertGating(config)
         else:
-            logger.info("Using predefined expert")
             self.expert_gate = None
         self.gradient_checkpointing = False
 
@@ -670,9 +655,6 @@ class MoEBertEncoder(nn.Module):
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
         all_cross_attentions = () if output_attentions and self.config.add_cross_attention else None
-
-        if self.expert_gate is not None and expert_id is not None:
-            logger.warning("When expert_id is specified, the expert_gate is not used")
 
         if not self.use_infer_expert:
             if expert_id is None:
@@ -717,9 +699,6 @@ class MoEBertEncoder(nn.Module):
             if self.gradient_checkpointing and self.training:
 
                 if use_cache:
-                    logger.warning(
-                        "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
-                    )
                     use_cache = False
 
                 def create_custom_forward(module):

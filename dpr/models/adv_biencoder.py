@@ -431,9 +431,6 @@ class PerturbationEstimator(object):
         self.step_epsilon = step_epsilon
         self.noise_norm = noise_norm
         self.sample_noise_norm = sample_noise_norm
-        # logger.info("Using %s as VAT loss", self.loss_type)
-        # logger.info("Using %s as for norm sample noise", self.sample_noise_norm)
-        # logger.info("Using %s as for norm perturb noise", self.noise_norm)
 
     def estimate_noise_for_ctx(self,
                                model,
@@ -689,8 +686,6 @@ class PerturbationEstimator(object):
         # TODO: Makes this configurable for context too.
         if hasattr(inputs, "question_rep_pos"):
             perturb_inputs["q_rep_token_pos"] = inputs.question_rep_pos
-        else:
-            logger.warning("No question rep positions")
 
         # perturb_outputs = model(
         #     None,
@@ -866,9 +861,6 @@ class VNBiEncoderNllLoss(object):
         # all_aux_loss = (cross_aux_loss + overall_aux_loss) / 2.0
         all_aux_loss = q_self_loss
 
-        logger.debug("clean_loss=%.3f", clean_loss)
-        logger.debug("all_aux_loss=%.3f", all_aux_loss)
-
         loss = clean_loss + vat_alpha * all_aux_loss
 
         max_score, max_idxs = torch.max(softmax_scores, 1)
@@ -971,7 +963,6 @@ class AdvBiEncoderNllLoss(object):
         # self_enf_loss = (q_self_loss + ctx_self_loss) / 2.0
         self_enf_loss = (q_self_loss + ctx_self_loss)
 
-        logger.debug("clean_loss=%.3f", clean_loss)
         if vat_alpha > 0.0:
             adv_log_scores = F.log_softmax(adv_scores, dim=1)
             if vat_loss_type == "kl":
@@ -1000,13 +991,9 @@ class AdvBiEncoderNllLoss(object):
             else:
                 raise ValueError("Unknown loss_type: %s" % vat_loss_type)
 
-            logger.debug("vat_loss=%.3f", adv_loss)
             loss = clean_loss + vat_alpha * adv_loss
         else:
             loss = clean_loss
-
-        logger.debug("self_enf_loss=%.3f", self_enf_loss)
-        logger.debug("all_aux_loss=%.3f", all_aux_loss)
 
         loss += vat_alpha * self_enf_loss
         # loss += vat_alpha * all_aux_loss * 0.1
@@ -1020,7 +1007,6 @@ class AdvBiEncoderNllLoss(object):
             sec_q_loss = torch.mean((q_norm - mu_q).norm(dim=0, p=2))
             sec_ctx_loss = torch.mean((ctx_norm - mu_ctx).norm(dim=0, p=2))
             sec_loss = (sec_q_loss + sec_ctx_loss) / 2.0
-            logger.debug("sec_loss: ", sec_loss.item())
             loss += gamma * sec_loss
 
         max_score, max_idxs = torch.max(softmax_scores, 1)
@@ -1062,7 +1048,6 @@ def _select_span_with_token(
                 query_tensor, tensorizer.get_pad_id(), tensorizer.max_length
             )
             query_tensor[-1] = tensorizer.tokenizer.sep_token_id
-            # logger.info('aligned query_tensor %s', query_tensor)
 
             assert id in query_tensor, "query_tensor={}".format(query_tensor)
             return query_tensor

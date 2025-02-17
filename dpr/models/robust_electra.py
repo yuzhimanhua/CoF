@@ -79,19 +79,13 @@ def load_tf_weights_in_electra(model, config, tf_checkpoint_path, discriminator_
         import numpy as np
         import tensorflow as tf
     except ImportError:
-        logger.error(
-            "Loading a TensorFlow model in PyTorch, requires TensorFlow to be installed. Please see "
-            "https://www.tensorflow.org/install/ for installation instructions."
-        )
         raise
     tf_path = os.path.abspath(tf_checkpoint_path)
-    logger.info(f"Converting TensorFlow checkpoint from {tf_path}")
     # Load weights from TF model
     init_vars = tf.train.list_variables(tf_path)
     names = []
     arrays = []
     for name, shape in init_vars:
-        logger.info(f"Loading TF weight {name} with shape {shape}")
         array = tf.train.load_variable(tf_path, name)
         names.append(name)
         arrays.append(array)
@@ -110,11 +104,9 @@ def load_tf_weights_in_electra(model, config, tf_checkpoint_path, discriminator_
             name = name.replace("generator_predictions/output_bias", "generator_lm_head/bias")
 
             name = name.split("/")
-            # print(original_name, name)
             # adam_v and adam_m are variables used in AdamWeightDecayOptimizer to calculated m and v
             # which are not required for using pretrained model
             if any(n in ["global_step", "temperature"] for n in name):
-                logger.info(f"Skipping {original_name}")
                 continue
             pointer = model
             for m_name in name:
@@ -145,10 +137,8 @@ def load_tf_weights_in_electra(model, config, tf_checkpoint_path, discriminator_
             except AssertionError as e:
                 e.args += (pointer.shape, array.shape)
                 raise
-            print(f"Initialize PyTorch weight {name}", original_name)
             pointer.data = torch.from_numpy(array)
         except AttributeError as e:
-            print(f"Skipping {original_name}", name, e)
             continue
     return model
 
@@ -559,9 +549,6 @@ class ElectraEncoder(nn.Module):
             if self.gradient_checkpointing and self.training:
 
                 if use_cache:
-                    logger.warning(
-                        "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
-                    )
                     use_cache = False
 
                 def create_custom_forward(module):

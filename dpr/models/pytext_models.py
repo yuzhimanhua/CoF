@@ -112,7 +112,6 @@ class PytextBertEncoder(TransformerSentenceEncoder):
         encoder = cls(cfg, padding_idx, vocab_size, projection_dim, **kwargs)
 
         if pretrained_file:
-            logger.info('Loading pre-trained pytext encoder state from %s', pretrained_file)
             state = torch.load(pretrained_file)
             encoder.load_state_dict(state)
         return encoder
